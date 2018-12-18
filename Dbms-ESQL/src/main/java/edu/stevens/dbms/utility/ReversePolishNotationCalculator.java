@@ -2,6 +2,7 @@ package edu.stevens.dbms.utility;
 
 import com.sun.codemodel.*;
 import edu.stevens.dbms.generator.QueryProcessor;
+import java.util.Map;
 import java.util.Stack;
 import java.util.regex.Pattern;
 
@@ -9,8 +10,11 @@ import java.util.regex.Pattern;
 public class ReversePolishNotationCalculator {
     private JCodeModel jCodeModel = null;
 
-    public ReversePolishNotationCalculator(JCodeModel jCodeModel) {
+    public  Map<String, String> attributesMethod = null;
+
+    public ReversePolishNotationCalculator(JCodeModel jCodeModel,Map<String, String> attributesMethod) {
         this.jCodeModel = jCodeModel;
+        this.attributesMethod= attributesMethod;
     }
 
 
@@ -84,7 +88,7 @@ public class ReversePolishNotationCalculator {
 
                     if (dbEval[0].matches("[A-Z]")) {
 
-                        operand[0] = JExpr.ref("resultSet").invoke(QueryProcessor.attributesMethod.get(dbEval[1])).arg(dbEval[1]);
+                        operand[0] = JExpr.ref("resultSet").invoke(this.attributesMethod.get(dbEval[1])).arg(dbEval[1]);
                     } else if ("PMF".equalsIgnoreCase(dbEval[0])) {
                         operand[0] = JExpr.ref("partialMfTable").invoke("get").arg(JExpr.ref("partialKeyToSearch")).invoke("get").arg(dbEval[1]);
                         operand[0] = (queryProcessor.accessStaticMethod(Double.class, "parseDouble").arg((JExpression) operand[0]));
@@ -93,8 +97,8 @@ public class ReversePolishNotationCalculator {
                                 JExpr.ref("mfAttrMap").invoke("get").arg(dbEval[1]).ne(JExpr._null()),
                                 JExpr.ref("mfAttrMap").invoke("get").arg(dbEval[1]), JExpr.lit("0"));
 
-                        if (QueryProcessor.attributesMethod != null
-                                && "getString".equalsIgnoreCase(QueryProcessor.attributesMethod.get(dbEval[1]))
+                        if (this.attributesMethod != null
+                                && "getString".equalsIgnoreCase(this.attributesMethod.get(dbEval[1]))
                                 ) {
                         } else {
                             operand[0] = (queryProcessor.accessStaticMethod(Double.class, "parseDouble").arg((JExpression) operand[0]));
@@ -114,7 +118,7 @@ public class ReversePolishNotationCalculator {
                     String dbEval[] = ((String) operand[1]).split("~", -1);
 
                     if (dbEval[0].matches("[A-Z]")) {
-                        operand[1] = JExpr.ref("resultSet").invoke(QueryProcessor.attributesMethod.get(dbEval[1])).arg(dbEval[1]);
+                        operand[1] = JExpr.ref("resultSet").invoke(this.attributesMethod.get(dbEval[1])).arg(dbEval[1]);
                     } else if ("PMF".equalsIgnoreCase(dbEval[0])) {
                         operand[1] = JExpr.ref("partialMfTable").invoke("get").arg(JExpr.ref("partialKeyToSearch")).invoke("get").arg(dbEval[1]);
                         operand[1] = (queryProcessor.accessStaticMethod(Double.class, "parseDouble").arg((JExpression) operand[0]));
@@ -124,8 +128,8 @@ public class ReversePolishNotationCalculator {
                                 JExpr.ref("mfAttrMap").invoke("get").arg(dbEval[1]).ne(JExpr._null()),
                                 JExpr.ref("mfAttrMap").invoke("get").arg(dbEval[1]), JExpr.lit("0"));
 
-                        if (QueryProcessor.attributesMethod != null
-                                && "getString".equalsIgnoreCase(QueryProcessor.attributesMethod.get(dbEval[1]))
+                        if (this.attributesMethod != null
+                                && "getString".equalsIgnoreCase(this.attributesMethod.get(dbEval[1]))
                                 ) {
                         } else {
                             operand[1] = queryProcessor.accessStaticMethod(Double.class, "parseDouble").arg((JExpression) operand[1]);

@@ -29,7 +29,7 @@ public class QueryProcessor {
     private String havingClause = null;
     private int groupingAttributesCount = 0;
     private int groupingVariables = 0;
-    public static Map<String, String> attributesMethod = new HashMap<>();
+    public Map<String, String> attributesMethod = new HashMap<>();
     private JCodeModel jCodeModel;
     private JDefinedClass jDefinedClass = null;
     private List<String> averageAggregateList;
@@ -42,17 +42,19 @@ public class QueryProcessor {
     public QueryProcessor() {
         this.jCodeModel = new JCodeModel();
         averageAggregateList = new ArrayList<String>();
-        QueryProcessor.attributesMethod.put("cust", "getString");
-        QueryProcessor.attributesMethod.put("prod", "getString");
-        QueryProcessor.attributesMethod.put("state", "getString");
-        QueryProcessor.attributesMethod.put("month", "getDouble");
-        QueryProcessor.attributesMethod.put("day", "getDouble");
-        QueryProcessor.attributesMethod.put("year", "getDouble");
-        QueryProcessor.attributesMethod.put("quant", "getDouble");
-
-        reversePolishNotationCalculator = new ReversePolishNotationCalculator(jCodeModel);
+        this.populateAtrributesMethodMap();
+        reversePolishNotationCalculator = new ReversePolishNotationCalculator(jCodeModel, attributesMethod);
     }
 
+    private void populateAtrributesMethodMap() {
+        this.attributesMethod.put("cust", "getString");
+        this.attributesMethod.put("prod", "getString");
+        this.attributesMethod.put("state", "getString");
+        this.attributesMethod.put("month", "getDouble");
+        this.attributesMethod.put("day", "getDouble");
+        this.attributesMethod.put("year", "getDouble");
+        this.attributesMethod.put("quant", "getDouble");
+    }
 
     public static void main(String args[]) {
 
@@ -759,11 +761,11 @@ public class QueryProcessor {
             String useDir = System.getProperty("user.dir");
 
             /*
-            *   Comment this
-            *   If generation of Evaluation Engine is via a jar
-            *   otherwise uncomment
-            *   If generation of Evaluation engine is via a IDE
-            * */
+             *   Comment this
+             *   If generation of Evaluation Engine is via a jar
+             *   otherwise uncomment
+             *   If generation of Evaluation engine is via a IDE
+             * */
             //useDir = useDir+"/src/main/java";
             System.out.println("File created at location = " + useDir + " in the package " + PACKAGE_NAME);
             queryProcessor.jCodeModel.build(new File(useDir));
