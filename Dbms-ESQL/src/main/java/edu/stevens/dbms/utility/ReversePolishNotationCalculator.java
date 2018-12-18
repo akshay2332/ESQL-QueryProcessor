@@ -2,6 +2,7 @@ package edu.stevens.dbms.utility;
 
 import com.sun.codemodel.*;
 import edu.stevens.dbms.generator.QueryProcessor;
+
 import java.util.Map;
 import java.util.Stack;
 import java.util.regex.Pattern;
@@ -10,11 +11,11 @@ import java.util.regex.Pattern;
 public class ReversePolishNotationCalculator {
     private JCodeModel jCodeModel = null;
 
-    public  Map<String, String> attributesMethod = null;
+    private Map<String, String> attributesMethod = null;
 
-    public ReversePolishNotationCalculator(JCodeModel jCodeModel,Map<String, String> attributesMethod) {
+    public ReversePolishNotationCalculator(JCodeModel jCodeModel, Map<String, String> attributesMethod) {
         this.jCodeModel = jCodeModel;
-        this.attributesMethod= attributesMethod;
+        this.attributesMethod = attributesMethod;
     }
 
 
@@ -384,6 +385,14 @@ class LinearQueue {
     }
 
 
+
+    public boolean isEmpty() {
+        if (front == null || this.getSize() == 0) {
+            return true;
+        } else {
+            return false;
+        }
+    }
 
 
     public void displayQueue() {
