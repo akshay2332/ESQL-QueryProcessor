@@ -757,6 +757,13 @@ public class QueryProcessor {
         // Generate the code
         try {
             String useDir = System.getProperty("user.dir");
+
+            /*
+            *   Comment this
+            *   If generation of Evaluation Engine is via a jar
+            *   otherwise uncomment
+            *   If generation of Evaluation engine is via a IDE
+            * */
             //useDir = useDir+"/src/main/java";
             System.out.println("File created at location = " + useDir + " in the package " + PACKAGE_NAME);
             queryProcessor.jCodeModel.build(new File(useDir));
