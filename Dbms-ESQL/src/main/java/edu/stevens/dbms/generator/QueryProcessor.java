@@ -484,7 +484,7 @@ public class QueryProcessor {
              *
              * */
             JBlock retrieveMethodBlock = retrieve.body();
-            JVar queryString = retrieveMethodBlock.decl(queryProcessor.jCodeModel.ref(String.class), "queryString", JExpr.lit(queryProcessor.DATABASE_QUERY));
+            JVar queryString = retrieveMethodBlock.decl(queryProcessor.jCodeModel.ref(String.class), "queryString", JExpr.lit(queryProcessor.DATABASE_QUERY.concat(" ").concat(queryProcessor.DATABASE_QUERY_TABLE)));
 
             // adding try block
             JTryBlock retrieveTryBlock = retrieveMethodBlock._try();
@@ -832,7 +832,7 @@ public class QueryProcessor {
         // Generate the code
         try {
             String useDir = System.getProperty("user.dir");
-            //useDir = useDir+"/src/main/java";
+            useDir = useDir+"/src/main/java";
             System.out.println("File created at location = " + useDir + " in the package " + PACKAGE_NAME);
             queryProcessor.jCodeModel.build(new File(useDir));
         } catch (IOException e) {
