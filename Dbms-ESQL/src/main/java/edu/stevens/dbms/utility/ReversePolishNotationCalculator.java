@@ -2,15 +2,22 @@ package edu.stevens.dbms.utility;
 
 import com.sun.codemodel.*;
 import edu.stevens.dbms.generator.QueryProcessor;
+
+import java.util.Map;
+import java.util.Objects;
 import java.util.Stack;
 import java.util.regex.Pattern;
 
 
 public class ReversePolishNotationCalculator {
-    private JCodeModel jCodeModel = null;
 
-    public ReversePolishNotationCalculator(JCodeModel jCodeModel) {
+    private Map<String, String> attributesMethod;
+
+    private JCodeModel jCodeModel;
+
+    public ReversePolishNotationCalculator(JCodeModel jCodeModel, Map<String, String> attributesMethod) {
         this.jCodeModel = jCodeModel;
+        this.attributesMethod = attributesMethod;
     }
 
 
@@ -19,12 +26,13 @@ public class ReversePolishNotationCalculator {
 
         Stack<Object> evaluatedStack = null;
         try {
-            evaluatedStack = this.evaluateExpression(evaluatorStack, null, new Stack<Object>(), 0);
+            evaluatedStack = this.evaluateExpression(evaluatorStack, null, new Stack<>(), 0);
         } catch (ArithmeticException ae) {
             System.out.println("The infix notation cannot be evaluated " + ae.getMessage());
         }
 
-        return (JExpression) evaluatedStack.pop();
+        assert evaluatedStack != null;
+        return (JExpression) Objects.requireNonNull(evaluatedStack).pop();
 
     }
 
@@ -39,7 +47,7 @@ public class ReversePolishNotationCalculator {
         while (evaluatorStack.size() != 0) {
 
             if ((evaluatorStack.peek() instanceof String &&
-                    (Pattern.compile("[a-z A-Z0-9\\_\\~\"]").matcher((String) evaluatorStack.peek()).find()))
+                    (Pattern.compile("[a-z A-Z0-9_~\"]").matcher((String) evaluatorStack.peek()).find()))
 
                     || evaluatorStack.peek() instanceof JExpression) {
                 currentChar = evaluatorStack.pop();
@@ -84,7 +92,7 @@ public class ReversePolishNotationCalculator {
 
                     if (dbEval[0].matches("[A-Z]")) {
 
-                        operand[0] = JExpr.ref("resultSet").invoke(QueryProcessor.attributesMethod.get(dbEval[1])).arg(dbEval[1]);
+                        operand[0] = JExpr.ref("resultSet").invoke(attributesMethod.get(dbEval[1])).arg(dbEval[1]);
                     } else if ("PMF".equalsIgnoreCase(dbEval[0])) {
                         operand[0] = JExpr.ref("partialMfTable").invoke("get").arg(JExpr.ref("partialKeyToSearch")).invoke("get").arg(dbEval[1]);
                         operand[0] = (queryProcessor.accessStaticMethod(Double.class, "parseDouble").arg((JExpression) operand[0]));
@@ -93,10 +101,9 @@ public class ReversePolishNotationCalculator {
                                 JExpr.ref("mfAttrMap").invoke("get").arg(dbEval[1]).ne(JExpr._null()),
                                 JExpr.ref("mfAttrMap").invoke("get").arg(dbEval[1]), JExpr.lit("0"));
 
-                        if (QueryProcessor.attributesMethod != null
-                                && "getString".equalsIgnoreCase(QueryProcessor.attributesMethod.get(dbEval[1]))
+                        if (attributesMethod == null
+                                || !"getString".equalsIgnoreCase(attributesMethod.get(dbEval[1]))
                                 ) {
-                        } else {
                             operand[0] = (queryProcessor.accessStaticMethod(Double.class, "parseDouble").arg((JExpression) operand[0]));
                         }
                     } else if (dbEval[0].matches("^[0-9]*$")) {
@@ -114,7 +121,7 @@ public class ReversePolishNotationCalculator {
                     String dbEval[] = ((String) operand[1]).split("~", -1);
 
                     if (dbEval[0].matches("[A-Z]")) {
-                        operand[1] = JExpr.ref("resultSet").invoke(QueryProcessor.attributesMethod.get(dbEval[1])).arg(dbEval[1]);
+                        operand[1] = JExpr.ref("resultSet").invoke(attributesMethod.get(dbEval[1])).arg(dbEval[1]);
                     } else if ("PMF".equalsIgnoreCase(dbEval[0])) {
                         operand[1] = JExpr.ref("partialMfTable").invoke("get").arg(JExpr.ref("partialKeyToSearch")).invoke("get").arg(dbEval[1]);
                         operand[1] = (queryProcessor.accessStaticMethod(Double.class, "parseDouble").arg((JExpression) operand[0]));
@@ -124,10 +131,9 @@ public class ReversePolishNotationCalculator {
                                 JExpr.ref("mfAttrMap").invoke("get").arg(dbEval[1]).ne(JExpr._null()),
                                 JExpr.ref("mfAttrMap").invoke("get").arg(dbEval[1]), JExpr.lit("0"));
 
-                        if (QueryProcessor.attributesMethod != null
-                                && "getString".equalsIgnoreCase(QueryProcessor.attributesMethod.get(dbEval[1]))
+                        if (attributesMethod == null
+                                || !"getString".equalsIgnoreCase(attributesMethod.get(dbEval[1]))
                                 ) {
-                        } else {
                             operand[1] = queryProcessor.accessStaticMethod(Double.class, "parseDouble").arg((JExpression) operand[1]);
 
                         }
@@ -239,7 +245,7 @@ public class ReversePolishNotationCalculator {
      *
      * */
     private Stack<Object> conversionInfixPostfix(String inputString) {
-        Stack<Object> postfixStackPointer = new Stack<Object>();
+        Stack<Object> postfixStackPointer = new Stack<>();
         LinearQueue infixExpressionQueue = formatInputString(inputString);
         //infixExpressionQueue.displayQueue();
         LinearQueue postFixExpressionQueue = new LinearQueue();
@@ -249,7 +255,7 @@ public class ReversePolishNotationCalculator {
             String currentElement = front.getData();
 
             front = front.getNext();
-            if ((Pattern.compile("[a-z A-Z0-9\\_\\~\"]").matcher((String) currentElement).find())) {
+            if ((Pattern.compile("[a-z A-Z0-9_~\"]").matcher(currentElement).find())) {
                 postFixExpressionQueue.enqueue(currentElement);
             } else if ("(".equalsIgnoreCase(currentElement)) {
                 postfixStackPointer.push(currentElement);
@@ -324,16 +330,6 @@ class Node {
     private String data;
     private Node next;
 
-    public Node() {
-        this.data = null;
-        this.next = null;
-    }
-
-    public Node(String data) {
-        this.data = data;
-        this.next = null;
-    }
-
     public Node(String data, Node next) {
         this.data = data;
         this.next = next;
@@ -378,9 +374,6 @@ class LinearQueue {
         // after adding the element increment the queue size
         size++;
     }
-
-
-
 
     public void displayQueue() {
         if (size != 0) {
