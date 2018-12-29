@@ -229,10 +229,10 @@ public class ReversePolishNotationCalculator {
     /*
      *   Code written for standardizing the input string for undisturbed evaluation and conversion of expression
      */
-    private LinearQueue formatInputString(String inputString) {
+    private LinearQueue<String> formatInputString(String inputString) {
 
         String conditions[] = inputString.trim().split(" ");
-        LinearQueue linearQueue = new LinearQueue();
+        LinearQueue<String> linearQueue = new LinearQueue<String>();
 
         for (String infixString : conditions) {
             linearQueue.enqueue(infixString);
@@ -246,15 +246,13 @@ public class ReversePolishNotationCalculator {
      * */
     private Stack<Object> conversionInfixPostfix(String inputString) {
         Stack<Object> postfixStackPointer = new Stack<>();
-        LinearQueue infixExpressionQueue = formatInputString(inputString);
+        LinearQueue<String> infixExpressionQueue = formatInputString(inputString);
         //infixExpressionQueue.displayQueue();
-        LinearQueue postFixExpressionQueue = new LinearQueue();
+        LinearQueue<String> postFixExpressionQueue = new LinearQueue<String>();
 
-        Node front = infixExpressionQueue.getFront();
-        while (front != null) {
-            String currentElement = front.getData();
-
-            front = front.getNext();
+        while (!infixExpressionQueue.isEmpty()) {
+            String currentElement = infixExpressionQueue.peek();
+            infixExpressionQueue.dequeue();
             if ((Pattern.compile("[a-z A-Z0-9_~\"]").matcher(currentElement).find())) {
                 postFixExpressionQueue.enqueue(currentElement);
             } else if ("(".equalsIgnoreCase(currentElement)) {
@@ -284,13 +282,11 @@ public class ReversePolishNotationCalculator {
             postFixExpressionQueue.enqueue(currentElementPopped);
         }
 
-        front = postFixExpressionQueue.getFront();
-
         /* dequeuing the queue */
-        while (front != null) {
-            String currentElement = front.getData();
+        while (!postFixExpressionQueue.isEmpty()) {
+            String currentElement = postFixExpressionQueue.peek();
+            postFixExpressionQueue.dequeue();
             postfixStackPointer.push(currentElement);
-            front = front.getNext();
         }
         return postfixStackPointer;
     }
@@ -326,44 +322,45 @@ public class ReversePolishNotationCalculator {
 }
 
 
-class Node {
-    private String data;
-    private Node next;
+class Node<T> {
+    private T data;
+    private Node<T> next;
 
-    public Node(String data, Node next) {
+
+    public Node(T data, Node<T> next) {
         this.data = data;
         this.next = next;
     }
 
-    public String getData() {
+    public T getData() {
         return data;
     }
 
-    public void setData(String data) {
+    public void setData(T data) {
         this.data = data;
     }
 
-    public Node getNext() {
+    public Node<T> getNext() {
         return next;
     }
 
-    public void setNext(Node next) {
+    public void setNext(Node<T> next) {
         this.next = next;
     }
 }
 
-class LinearQueue {
+class LinearQueue<T> {
 
-    private Node front;
-    private Node rear;
+    private Node<T> front;
+    private Node<T> rear;
     // size will be initialised to zero
     private int size;
 
     /*
      *   insert element into queue
      */
-    public void enqueue(String data) {
-        Node currentLinkedListNode = new Node(data, null);
+    public void enqueue(T data) {
+        Node<T> currentLinkedListNode = new Node<T>(data, null);
         if (rear == null) {
             front = currentLinkedListNode;
             rear = currentLinkedListNode;
@@ -380,7 +377,7 @@ class LinearQueue {
             /*
              *  The queue always start from front pointer
              */
-            Node pointerForDisplay = front;
+            Node<T> pointerForDisplay = front;
             do {
                 System.out.print(pointerForDisplay.getData());
                 pointerForDisplay = pointerForDisplay.getNext();
@@ -393,11 +390,26 @@ class LinearQueue {
         }
     }
 
-    public void peek() {
-        if (front == null) {
-            System.out.println("The queue is empty.");
+    public boolean isEmpty() {
+        return front == null ? true : false;
+    }
+
+
+    public T dequeue() {
+        if (this.isEmpty()) {
+            return null;
         } else {
-            System.out.println("Element of queue " + rear.getData());
+            T data = this.front.getData();
+            this.front = this.front.getNext();
+            return data;
+        }
+    }
+
+    public T peek() {
+        if (this.isEmpty()) {
+            return null;
+        } else {
+            return this.front.getData();
         }
     }
 
@@ -409,7 +421,7 @@ class LinearQueue {
         this.size = size;
     }
 
-    public Node getFront() {
+    public Node<T> getFront() {
         return front;
     }
 
@@ -417,7 +429,7 @@ class LinearQueue {
         this.front = front;
     }
 
-    public Node getRear() {
+    public Node<T> getRear() {
         return rear;
     }
 
