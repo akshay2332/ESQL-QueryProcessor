@@ -8,18 +8,19 @@ import java.sql.*;
 import java.text.DecimalFormat;
 import java.util.*;
 
+
 public class QueryProcessor {
 
 
-    private static String DATABASE_QUERY = "DATABASE_QUERY";
-    private static String DATABASE_CONNECTION_URL = "DATABASE_CONNECTION_URL";
-    private static String DATABASE_CONNECTION_PORT = "DATABASE_CONNECTION_PORT";
-    private static String DATABASE_NAME = "DATABASE_NAME";
-    private static String DATABASE_USERNAME = "DATABASE_USERNAME";
-    private static String DATABASE_PASSWORD = "DATABASE_PASSWORD";
-    private static String DATABASE_DRIVER = "DATABASE_DRIVER";
-    private static String QUERY_FILE_NAME = "QUERY_FILE_NAME";
-
+    private String DATABASE_QUERY_TABLE = "DATABASE_QUERY_TABLE";
+    private String DATABASE_QUERY = "SELECT * FROM";
+    private String DATABASE_CONNECTION_URL = "DATABASE_CONNECTION_URL";
+    private String DATABASE_CONNECTION_PORT = "DATABASE_CONNECTION_PORT";
+    private String DATABASE_NAME = "DATABASE_NAME";
+    private String DATABASE_USERNAME = "DATABASE_USERNAME";
+    private String DATABASE_PASSWORD = "DATABASE_PASSWORD";
+    private String DATABASE_DRIVER = "DATABASE_DRIVER";
+    private String QUERY_FILE_NAME = "QUERY_FILE_NAME";
     private String whereClause = null;
     private String[] selectAttributes = null;
     private String[] aggregateFunctionList = null;
@@ -29,37 +30,112 @@ public class QueryProcessor {
     private String havingClause = null;
     private int groupingAttributesCount = 0;
     private int groupingVariables = 0;
-    public Map<String, String> attributesMethod = new HashMap<>();
+    private Map<String, String> attributesMethod = new HashMap<>();
     private JCodeModel jCodeModel;
     private JDefinedClass jDefinedClass = null;
     private List<String> averageAggregateList;
     private boolean averageAggregateFlag = false;
     private ReversePolishNotationCalculator reversePolishNotationCalculator;
-    private String partitionConditionForEMF = null;
+    private StringBuffer partitionConditionForEMF = null;
     private static final String PACKAGE_NAME = "edu.stevens.dbms.queryengine";
+    private static final String DB_CONFIG_FILE_NAME = "databaseconfig.properties";
 
 
     public QueryProcessor() {
         this.jCodeModel = new JCodeModel();
-        averageAggregateList = new ArrayList<String>();
-        this.populateAtrributesMethodMap();
-        reversePolishNotationCalculator = new ReversePolishNotationCalculator(jCodeModel, attributesMethod);
+        averageAggregateList = new ArrayList<>();
     }
 
-    private void populateAtrributesMethodMap() {
-        this.attributesMethod.put("cust", "getString");
-        this.attributesMethod.put("prod", "getString");
-        this.attributesMethod.put("state", "getString");
-        this.attributesMethod.put("month", "getDouble");
-        this.attributesMethod.put("day", "getDouble");
-        this.attributesMethod.put("year", "getDouble");
-        this.attributesMethod.put("quant", "getDouble");
+    private void getTablesMetaData() {
+
+        try {
+            Class.forName(this.DATABASE_DRIVER);
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+            System.exit(-1);
+        }
+        Connection connection;
+        this.DATABASE_CONNECTION_URL = this.DATABASE_CONNECTION_URL.concat(":").concat(this.DATABASE_CONNECTION_PORT).concat("/").concat(this.DATABASE_NAME);
+        try {
+            connection = DriverManager.getConnection(this.DATABASE_CONNECTION_URL, this.DATABASE_USERNAME, this.DATABASE_PASSWORD);
+            DatabaseMetaData databaseMetaData = connection.getMetaData();
+            ResultSet columnDetails = databaseMetaData.getColumns(null, null, this.DATABASE_QUERY_TABLE, null);
+            /*
+            *
+            *   -7	BIT
+                -6	TINYINT
+                -5	BIGINT
+                -4	LONGVARBINARY
+                -3	VARBINARY
+                -2	BINARY
+                -1	LONGVARCHAR
+                0	NULL
+                1	CHAR
+                2	NUMERIC
+                3	DECIMAL
+                4	INTEGER
+                5	SMALLINT
+                6	FLOAT
+                7	REAL
+                8	DOUBLE
+                12	VARCHAR
+                91	DATE
+                92	TIME
+                93	TIMESTAMP
+            *
+            *
+            * */
+
+            while (columnDetails.next()) {
+                String columnName = columnDetails.getString("COLUMN_NAME");
+                int columnDataType = columnDetails.getInt("DATA_TYPE");
+
+                switch (columnDataType) {
+                    case -7: {
+                        this.attributesMethod.put(columnName, "getBoolean");
+                        break;
+                    }
+                    case -1: {
+                        this.attributesMethod.put(columnName, "getString");
+                        break;
+                    }
+                    case 1: {
+                        this.attributesMethod.put(columnName, "getString");
+                        break;
+                    }
+                    case 12: {
+                        this.attributesMethod.put(columnName, "getString");
+                        break;
+                    }
+                    case 91: {
+                        this.attributesMethod.put(columnName, "getDate");
+                        break;
+                    }
+                    default: {
+                        this.attributesMethod.put(columnName, "getDouble");
+                        break;
+                    }
+                }
+            }
+            reversePolishNotationCalculator = new ReversePolishNotationCalculator(jCodeModel, attributesMethod);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            System.exit(-1);
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.exit(0);
+        }
+
+
     }
+
 
     public static void main(String args[]) {
 
         QueryProcessor queryProcessor = new QueryProcessor();
         queryProcessor.readDatabaseProperties();
+        queryProcessor.getTablesMetaData();
+        //queryProcessor.readFileContent();
         queryProcessor.readMFFileContent();
 
         JPackage jPackage = queryProcessor.jCodeModel._package(PACKAGE_NAME);
@@ -73,7 +149,7 @@ public class QueryProcessor {
             queryProcessor.jDefinedClass = jPackage._class("QueryOptimizer");
             queryProcessor.jDefinedClass.javadoc().add("Query Processing engine.");
 
-            JExpression connectionURLValue = JExpr.lit(QueryProcessor.DATABASE_CONNECTION_URL + ":" + QueryProcessor.DATABASE_CONNECTION_PORT + "/" + QueryProcessor.DATABASE_NAME);
+            JExpression connectionURLValue = JExpr.lit(queryProcessor.DATABASE_CONNECTION_URL);
             JFieldVar connectionURlVariable = queryProcessor.createVariable(JMod.PRIVATE | JMod.FINAL | JMod.STATIC, String.class, "connectionURL", connectionURLValue);
             JFieldVar averageAggregateFlag = queryProcessor.createVariable(JMod.PRIVATE, boolean.class, "averageAggregateFlag", JExpr.lit(false));
             JFieldVar averageAggregateList = queryProcessor.createVariable(JMod.PRIVATE, List.class, "averageAggregateList", JExpr._null());
@@ -116,7 +192,7 @@ public class QueryProcessor {
             JBlock jBlock = connectMethod.body();
 
             JTryBlock jTryBlock = jBlock._try();
-            jTryBlock.body().add(queryProcessor.accessStaticMethod(Class.class, "forName").arg(DATABASE_DRIVER));
+            jTryBlock.body().add(queryProcessor.accessStaticMethod(Class.class, "forName").arg(queryProcessor.DATABASE_DRIVER));
 
             JCatchBlock jCatchBlock = jTryBlock._catch(queryProcessor.jCodeModel.ref(Exception.class));
 
@@ -200,7 +276,7 @@ public class QueryProcessor {
                     havingClauseMfTableDisplay.invoke(queryProcessor.jCodeModel.ref(System.class).staticRef("out"), "print").arg("\t");
                 }
             }
-            havingClauseMfTableDisplay.add(queryProcessor.printScreen(""));
+            havingClauseMfTableDisplay.add(queryProcessor.printScreen());
 
 
             /*
@@ -408,7 +484,7 @@ public class QueryProcessor {
              *
              * */
             JBlock retrieveMethodBlock = retrieve.body();
-            JVar queryString = retrieveMethodBlock.decl(queryProcessor.jCodeModel.ref(String.class), "queryString", JExpr.lit(QueryProcessor.DATABASE_QUERY));
+            JVar queryString = retrieveMethodBlock.decl(queryProcessor.jCodeModel.ref(String.class), "queryString", JExpr.lit(queryProcessor.DATABASE_QUERY));
 
             // adding try block
             JTryBlock retrieveTryBlock = retrieveMethodBlock._try();
@@ -418,7 +494,7 @@ public class QueryProcessor {
 
             JVar connection = retrieveBlockInsideTry.decl(queryProcessor.jCodeModel.ref(Connection.class), "connection", JExpr._null());
             retrieveBlockInsideTry.assign(connection, queryProcessor.accessStaticMethod(DriverManager.class, "getConnection").
-                    arg(connectionURlVariable).arg(JExpr.lit(QueryProcessor.DATABASE_USERNAME)).arg(JExpr.lit(QueryProcessor.DATABASE_PASSWORD)));
+                    arg(connectionURlVariable).arg(JExpr.lit(queryProcessor.DATABASE_USERNAME)).arg(JExpr.lit(queryProcessor.DATABASE_PASSWORD)));
 
             JVar statement = retrieveBlockInsideTry.decl(queryProcessor.jCodeModel.ref(Statement.class), "statement", JExpr._null());
             retrieveBlockInsideTry.assign(statement, queryProcessor.accessNonStaticMethod(connection, "createStatement"));
@@ -535,9 +611,9 @@ public class QueryProcessor {
                 List<String> variableAttributeList = queryProcessor.groupingVariablesDependencyChecking(i);
 
                 if ((variableAttributeList.isEmpty()
-                        || variableAttributeList.size() == queryProcessor.groupingAttributes.length)
-                        && (queryProcessor.partitionConditionForEMF == null
-                        || queryProcessor.partitionConditionForEMF.isEmpty())) {
+                        || (variableAttributeList.size() == queryProcessor.groupingAttributes.length))
+                        && ((queryProcessor.partitionConditionForEMF == null)
+                        || (queryProcessor.partitionConditionForEMF.length() == 0))) {
                     /*
                      *   dependent on all grouping attributes
                      *   and no dependency on previous mf values
@@ -572,7 +648,10 @@ public class QueryProcessor {
                     } else {
                         case_i_body.assign(averageAggregateFlag, JExpr.lit(false));
                     }
+
+
                     JBlock while_i_LoopBlock = case_i_body._while(resultPresent).body();
+
 
                     while_i_LoopBlock.assign(keyOfMFTable, queryProcessor.formKeyGroupingAttributes(queryProcessor.groupingAttributes));
 
@@ -589,10 +668,7 @@ public class QueryProcessor {
                     case_i_body.assign(averageAggregateList, JExpr._null());
 
                     case_i_body._break();
-
                 } else {
-
-
                     JCase jCase_i = scanLoopSwitch._case(JExpr.lit((i + 1)));
                     JBlock case_i_body = jCase_i.body();
 
@@ -618,7 +694,6 @@ public class QueryProcessor {
                         case_i_body.assign(averageAggregateFlag, JExpr.lit(false));
                     }
 
-
                     JVar partialMfTable = case_i_body.decl(queryProcessor.jCodeModel.ref(Map.class), "partialMfTable");
                     partialMfTable.type(mfTableType);
                     case_i_body.assign(partialMfTable, JExpr._new(queryProcessor.jCodeModel.ref(HashMap.class).narrow(queryProcessor.jCodeModel.ref(String.class)).narrow(retrieveMfTye)));
@@ -634,7 +709,7 @@ public class QueryProcessor {
                     // dependency on MF table
                     // for each row in MF table check the current row of database
 
-                    if (queryProcessor.partitionConditionForEMF != null && !queryProcessor.partitionConditionForEMF.isEmpty()) {
+                    if (queryProcessor.partitionConditionForEMF != null && !(queryProcessor.partitionConditionForEMF.length() == 0)) {
 
                         JVar partialKeyToSearch = case_i_body_if.decl(queryProcessor.jCodeModel.ref(String.class), "partialKeyToSearch", JExpr.lit(""));
                         mapKeys = case_i_body_if.decl(queryProcessor.jCodeModel.ref(Set.class).narrow(String.class), "mapKeys", mfTable.invoke("keySet"));
@@ -667,7 +742,7 @@ public class QueryProcessor {
                                 mfAttrMap.ne(JExpr._null()).cand(partialKeyToSearch.invoke("equalsIgnoreCase").arg(keyOfMFTable))
                         )._then();
 
-                        JBlock case_0_avgAggForEachBodyIf = matchingPartialKeyBlock._if(queryProcessor.reversePolishNotationCalculator.performReversePolishNotation(queryProcessor.partitionConditionForEMF.trim()))._then();
+                        JBlock case_0_avgAggForEachBodyIf = matchingPartialKeyBlock._if(queryProcessor.reversePolishNotationCalculator.performReversePolishNotation(queryProcessor.partitionConditionForEMF.toString().trim()))._then();
                         case_0_avgAggForEachBodyIf.assign(mfTempMap, JExpr._this().invoke(performAggregation).arg(resultSet).arg(aggregateFunctionForGVI).arg(mfTempMap));
                         case_0_avgAggForEachBodyIf.add(mfTable.invoke("put").arg(case_0_avgAggrForeach.var()).arg(mfAttrMap));
                     } else {
@@ -679,7 +754,7 @@ public class QueryProcessor {
                     while_i_LoopBlock.assign(resultPresent, queryProcessor.accessNonStaticMethod(resultSet, "next"));
 
 
-                    if (queryProcessor.partitionConditionForEMF == null || queryProcessor.partitionConditionForEMF.isEmpty()) {
+                    if (queryProcessor.partitionConditionForEMF == null || queryProcessor.partitionConditionForEMF.length() == 0) {
 
                         JVar partialKeyToSearch = case_i_body.decl(queryProcessor.jCodeModel.ref(String.class), "partialKeyToSearch", JExpr.lit(""));
                         mapKeys = case_i_body.decl(queryProcessor.jCodeModel.ref(Set.class).narrow(String.class), "mapKeys", mfTable.invoke("keySet"));
@@ -712,9 +787,7 @@ public class QueryProcessor {
                     case_i_body.assign(averageAggregateList, JExpr._null());
 
                     case_i_body._break();
-
                 }
-
             }
 
 
@@ -759,13 +832,6 @@ public class QueryProcessor {
         // Generate the code
         try {
             String useDir = System.getProperty("user.dir");
-
-            /*
-             *   Comment this
-             *   If generation of Evaluation Engine is via a jar
-             *   otherwise uncomment
-             *   If generation of Evaluation engine is via a IDE
-             * */
             //useDir = useDir+"/src/main/java";
             System.out.println("File created at location = " + useDir + " in the package " + PACKAGE_NAME);
             queryProcessor.jCodeModel.build(new File(useDir));
@@ -787,10 +853,10 @@ public class QueryProcessor {
     }
 
 
-    private JStatement printScreen(String valueToPrint) {
+    private JStatement printScreen() {
         JBlock jBlock = new JBlock();
 
-        return jBlock.invoke(jCodeModel.ref(System.class).staticRef("out"), "println").arg(valueToPrint);
+        return jBlock.invoke(jCodeModel.ref(System.class).staticRef("out"), "println").arg("");
     }
 
     private JMethod createMethod(int modifierType, JType jType, String name) {
@@ -815,29 +881,30 @@ public class QueryProcessor {
     }
 
     private List<String> fetchAggregateFunctionList(String groupingVariableIdentity) {
-        List<String> aggregateFunction = new ArrayList<String>();
-        if ((groupingVariableIdentity != null) && (groupingVariableIdentity != "")) {
-            for (String element : aggregateFunctionList) {
-                element = element.trim();
-                if (element.contains(groupingVariableIdentity)) {
-                    aggregateFunction.add(element);
-                    if (element.contains("avg")) {
-                        averageAggregateFlag = true;
-                        averageAggregateList.add(element);
-                        aggregateFunction.add(element.replace("avg", "count"));
+        List<String> aggregateFunction = new ArrayList<>();
+        if ((groupingVariableIdentity != null))
+            if ((!Objects.equals(groupingVariableIdentity, ""))) {
+                for (String element : aggregateFunctionList) {
+                    element = element.trim();
+                    if (element.contains(groupingVariableIdentity)) {
+                        aggregateFunction.add(element);
+                        if (element.contains("avg")) {
+                            averageAggregateFlag = true;
+                            averageAggregateList.add(element);
+                            aggregateFunction.add(element.replace("avg", "count"));
+                        }
                     }
                 }
-            }
 
-            for (String selection : selectAttributes) {
-                selection = selection.trim();
-                if (selection.contains(groupingVariableIdentity) && !aggregateFunction.contains(selection.trim())) {
-                    aggregateFunction.add(selection);
+                for (String selection : selectAttributes) {
+                    selection = selection.trim();
+                    if (selection.contains(groupingVariableIdentity) && !aggregateFunction.contains(selection.trim())) {
+                        aggregateFunction.add(selection);
+                    }
                 }
+
+
             }
-
-
-        }
         return aggregateFunction;
     }
 
@@ -845,15 +912,15 @@ public class QueryProcessor {
     private void readDatabaseProperties() {
 
         Properties databaseProperties = new Properties();
-        InputStream input = null;
+        InputStream input;
 
         try {
 
-            input = new FileInputStream("databaseconfig.properties");
+            input = new FileInputStream(QueryProcessor.DB_CONFIG_FILE_NAME);
 
             // loading a properties file
             databaseProperties.load(input);
-            DATABASE_QUERY = databaseProperties.getProperty(DATABASE_QUERY);
+            DATABASE_QUERY_TABLE = databaseProperties.getProperty(DATABASE_QUERY_TABLE);
             DATABASE_CONNECTION_URL = databaseProperties.getProperty(DATABASE_CONNECTION_URL);
             DATABASE_CONNECTION_PORT = databaseProperties.getProperty(DATABASE_CONNECTION_PORT);
             DATABASE_NAME = databaseProperties.getProperty(DATABASE_NAME);
@@ -869,7 +936,7 @@ public class QueryProcessor {
 
     private void readMFFileContent() {
         Properties mfQueryProperties = new Properties();
-        InputStream inputStream = null;
+        InputStream inputStream;
 
         try {
             inputStream = new FileInputStream(QUERY_FILE_NAME);
@@ -962,10 +1029,10 @@ public class QueryProcessor {
                         toReplace = groupingVariableCondition.substring(subStringStartIndex, endSubStringIndex - 1);
                     }
                     groupingVariableCondition = groupingVariableCondition.replace(toReplace, "true");
-                    if (partitionConditionForEMF == null || partitionConditionForEMF.isEmpty()) {
-                        partitionConditionForEMF = toReplace;
+                    if (partitionConditionForEMF == null || partitionConditionForEMF.length() == 0) {
+                        partitionConditionForEMF = new StringBuffer(toReplace);
                     } else {
-                        partitionConditionForEMF = partitionConditionForEMF + " & " + toReplace;
+                        partitionConditionForEMF = partitionConditionForEMF.append(" & ").append(toReplace);
                     }
 
                 }
